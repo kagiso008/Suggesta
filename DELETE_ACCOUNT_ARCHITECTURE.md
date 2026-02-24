@@ -1,0 +1,515 @@
+# Delete Account Feature - Architecture & Flow Diagrams
+
+## 1. High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     SUGGESTA DELETE ACCOUNT                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────────┐        ┌──────────────────┐               │
+│  │   Flutter App    │        │   Supabase       │               │
+│  │  (iOS/Android)   │        │   Backend        │               │
+│  ├──────────────────┤        ├──────────────────┤               │
+│  │                  │        │                  │               │
+│  │ Profile Screen   │────→   │  Edge Function   │               │
+│  │ (UI)             │  POST  │  delete-account  │               │
+│  │                  │  /     │  (TypeScript)    │               │
+│  │ Delete Button    │  JSON  │                  │               │
+│  │                  │        │  ├─ Validate    │               │
+│  │ Confirmation     │        │  ├─ Authorize   │               │
+│  │ Dialog           │        │  ├─ Delete User │               │
+│  │                  │        │  └─ Cascade     │               │
+│  │ Error Handling   │←────   │                  │               │
+│  │                  │ JSON   │                  │               │
+│  └──────────────────┘        └────────┬─────────┘               │
+│                                       │                         │
+│                                       ↓                         │
+│                              ┌──────────────────┐               │
+│                              │   PostgreSQL     │               │
+│                              │   Database       │               │
+│                              ├──────────────────┤               │
+│                              │                  │               │
+│                              │ ON DELETE        │               │
+│                              │ CASCADE          │               │
+│                              │                  │               │
+│                              │ ├─ profiles      │               │
+│                              │ ├─ topics        │               │
+│                              │ ├─ suggestions   │               │
+│                              │ ├─ comments      │               │
+│                              │ ├─ votes         │               │
+│                              │ ├─ messages      │               │
+│                              │ └─ ...other data │               │
+│                              │                  │               │
+│                              └──────────────────┘               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. User Interaction Flow
+
+```
+User Opens App
+    ↓
+Welcome Screen
+    ↓
+[Sign Up / Sign In]
+    ↓
+Home / Main App
+    ↓
+User Navigates to Profile
+    ↓
+┌──────────────────────────────────────┐
+│      Profile Screen                  │
+│  ┌────────────────────────────────┐  │
+│  │ [Edit Profile]                 │  │
+│  │ [Sign Out]                     │  │
+│  │ [Delete Account] ← User taps   │  │
+│  └────────────────────────────────┘  │
+└──────────┬───────────────────────────┘
+           ↓
+┌──────────────────────────────────────┐
+│    Confirmation Dialog               │
+│                                      │
+│ ⚠️  Delete Account                   │
+│                                      │
+│ This action cannot be undone.        │
+│ Your account and all data will be    │
+│ permanently deleted.                 │
+│                                      │
+│  [Cancel]  [Delete Account]          │
+└──────────┬──────────────────┬────────┘
+           │                  │
+        Cancel            Confirm
+           │                  │
+           ↓                  ↓
+      Stay on            API Call
+      Profile        POST /delete-account
+                     
+                            ↓
+                     ┌──────────────────┐
+                     │ Loading Spinner  │
+                     │ "Deleting..."    │
+                     └────────┬─────────┘
+                              ↓
+                         Edge Function
+                    Validates & Deletes
+                              ↓
+                     ┌──────────────────┐
+                     │ Success          │
+                     │ Account deleted  │
+                     │ Signing out...   │
+                     └────────┬─────────┘
+                              ↓
+                         Sign Out
+                              ↓
+                       Navigate to
+                       Welcome Screen
+                              ↓
+                         Account Gone ✅
+```
+
+---
+
+## 3. Edge Function Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   DELETE-ACCOUNT EDGE FUNCTION                  │
+└─────────────────────────────────────────────────────────────────┘
+
+HTTP POST Request Received
+    ↓
+┌─────────────────────────────────────────┐
+│ Validate Request                        │
+├─────────────────────────────────────────┤
+│                                         │
+│ ✓ Check HTTP Method = POST              │
+│ ✓ Check Body contains userId            │
+│ ✓ Check Authorization header exists     │
+│                                         │
+│ If any check fails:                     │
+│   Return 400/401 Error                  │
+└────────────┬────────────────────────────┘
+             ↓
+┌─────────────────────────────────────────┐
+│ Authenticate User                       │
+├─────────────────────────────────────────┤
+│                                         │
+│ ✓ Extract JWT token from header         │
+│ ✓ Verify token signature                │
+│ ✓ Check token not expired               │
+│ ✓ Get authenticated user ID             │
+│                                         │
+│ If authentication fails:                │
+│   Return 401 Unauthorized               │
+└────────────┬────────────────────────────┘
+             ↓
+┌─────────────────────────────────────────┐
+│ Authorize Request                       │
+├─────────────────────────────────────────┤
+│                                         │
+│ ✓ Compare authenticated user with       │
+│   requested userId                      │
+│ ✓ Verify user can only delete own acc't │
+│                                         │
+│ If authorization fails:                 │
+│   Return 403 Forbidden                  │
+└────────────┬────────────────────────────┘
+             ↓
+┌─────────────────────────────────────────┐
+│ Delete User                             │
+├─────────────────────────────────────────┤
+│                                         │
+│ Call admin API:                         │
+│   adminClient.auth.admin.deleteUser()   │
+│                                         │
+│ This triggers:                          │
+│   1. Delete auth.users record           │
+│   2. Cascade delete to all related      │
+│      tables (profiles, topics, etc)     │
+│   3. Database constraints enforce       │
+│      data integrity                     │
+│                                         │
+│ If deletion fails:                      │
+│   Return 500 Server Error               │
+└────────────┬────────────────────────────┘
+             ↓
+┌─────────────────────────────────────────┐
+│ Return Success Response                 │
+├─────────────────────────────────────────┤
+│                                         │
+│ HTTP 200 OK                             │
+│ {                                       │
+│   "success": true,                      │
+│   "message": "Account deleted",         │
+│   "deletedAt": "2026-02-19T..."         │
+│ }                                       │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 4. Database Cascade Deletion
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  DATABASE CASCADE DELETION                       │
+│              (Automatic - triggered by FK constraints)           │
+└─────────────────────────────────────────────────────────────────┘
+
+Edge Function Deletes: auth.users (user_id)
+    ↓
+    ├─→ CASCADE to profiles (id references auth.users)
+    │   └─→ CASCADE to:
+    │       ├─ topics (user_id)
+    │       │  └─→ CASCADE to:
+    │       │      ├─ topic_votes (topic_id)
+    │       │      ├─ topic_follows (topic_id)
+    │       │      └─ suggestions (topic_id)
+    │       │         └─→ CASCADE to:
+    │       │             ├─ suggestion_votes (suggestion_id)
+    │       │             └─ comments (suggestion_id)
+    │       │
+    │       ├─ suggestions (user_id)
+    │       │  └─→ CASCADE to:
+    │       │      ├─ suggestion_votes (suggestion_id)
+    │       │      ├─ comments (suggestion_id)
+    │       │      └─ comment_votes (comment_id)
+    │       │
+    │       ├─ comments (user_id)
+    │       │  └─→ CASCADE to:
+    │       │      ├─ comment_votes (comment_id)
+    │       │      └─ nested comments (parent_id)
+    │       │
+    │       ├─ topic_votes (user_id)
+    │       ├─ suggestion_votes (user_id)
+    │       ├─ topic_follows (user_id)
+    │       ├─ messages (sender_id)
+    │       │  └─→ CASCADE to:
+    │       │      └─ message_reads (message_id)
+    │       │
+    │       ├─ conversations (if user in participants)
+    │       │  └─→ CASCADE to:
+    │       │      └─ messages (conversation_id)
+    │       │
+    │       └─ Any other user-related data
+
+Result:
+    ✅ ZERO orphaned records
+    ✅ ZERO references to deleted user
+    ✅ Database integrity maintained
+    ✅ Complete data removal
+```
+
+---
+
+## 5. Security Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SECURITY VALIDATION                          │
+└─────────────────────────────────────────────────────────────────┘
+
+Request from Client
+    ↓
+┌──────────────────────────────────────────┐
+│ LAYER 1: Transport Security              │
+├──────────────────────────────────────────┤
+│ ✓ HTTPS only (automatic)                 │
+│ ✓ TLS/SSL encryption                     │
+│ ✓ No credentials in URL                  │
+└────────────┬─────────────────────────────┘
+             ↓
+┌──────────────────────────────────────────┐
+│ LAYER 2: Request Validation              │
+├──────────────────────────────────────────┤
+│ ✓ Check HTTP method = POST               │
+│ ✓ Validate JSON payload                  │
+│ ✓ Required fields present                │
+│ ✓ Proper data types                      │
+└────────────┬─────────────────────────────┘
+             ↓
+┌──────────────────────────────────────────┐
+│ LAYER 3: Authentication                  │
+├──────────────────────────────────────────┤
+│ ✓ Authorization header present           │
+│ ✓ JWT token format valid                 │
+│ ✓ Token signature verified               │
+│ ✓ Token not expired                      │
+│ ✓ Token claims valid                     │
+└────────────┬─────────────────────────────┘
+             ↓
+┌──────────────────────────────────────────┐
+│ LAYER 4: Authorization                   │
+├──────────────────────────────────────────┤
+│ ✓ User is authenticated                  │
+│ ✓ Authenticated user ID = requested ID   │
+│ ✓ No privilege escalation                │
+│ ✓ User can only delete own account       │
+└────────────┬─────────────────────────────┘
+             ↓
+┌──────────────────────────────────────────┐
+│ LAYER 5: Business Logic                  │
+├──────────────────────────────────────────┤
+│ ✓ User exists in system                  │
+│ ✓ No rate limiting bypass                │
+│ ✓ Idempotent operation                   │
+│ ✓ Transaction integrity                  │
+└────────────┬─────────────────────────────┘
+             ↓
+┌──────────────────────────────────────────┐
+│ LAYER 6: Database Security               │
+├──────────────────────────────────────────┤
+│ ✓ Service role key (not client secret)   │
+│ ✓ Row-level security (RLS) bypassed      │
+│ ✓ ON DELETE CASCADE enforced             │
+│ ✓ Foreign key constraints active         │
+└────────────┬─────────────────────────────┘
+             ↓
+┌──────────────────────────────────────────┐
+│ LAYER 7: Error Handling                  │
+├──────────────────────────────────────────┤
+│ ✓ No sensitive data in errors            │
+│ ✓ No stack traces exposed                │
+│ ✓ Proper HTTP status codes               │
+│ ✓ Logging for debugging                  │
+└────────────┬─────────────────────────────┘
+             ↓
+Success or Secure Error Response
+```
+
+---
+
+## 6. State Transitions
+
+```
+┌─────────────────────────────────────────┐
+│     APP STATE MACHINE                   │
+└─────────────────────────────────────────┘
+
+                    Initial State
+                        ↑
+                        │
+              ┌─────────┴─────────┐
+              │                   │
+         [Logged Out]         [Logged In]
+              │                   │
+    ┌─────────┘                   └─────────┐
+    │                                       │
+    │          User on Profile Screen       │
+    │               (Logged In)             │
+    │                                       │
+    │          [Delete Account] clicked     │
+    │                                       │
+    ├─→ State: DELETING (loading)          │
+    │   └─→ Show loading spinner           │
+    │       Disable all buttons             │
+    │                                       │
+    │   Edge Function processing           │
+    │       ↓                               │
+    │   ┌─────────────────────────┐        │
+    │   │ Possible Outcomes:      │        │
+    │   ├─────────────────────────┤        │
+    │   │ ✅ Success              │        │
+    │   │    Sign out             │        │
+    │   │    Go to Welcome        │        │
+    │   │    State: LOGGED_OUT    │        │
+    │   │                         │        │
+    │   │ ❌ Auth Error           │        │
+    │   │    Show error           │        │
+    │   │    Stay on Profile      │        │
+    │   │    State: LOGGED_IN     │        │
+    │   │                         │        │
+    │   │ ❌ Network Error        │        │
+    │   │    Show error           │        │
+    │   │    Stay on Profile      │        │
+    │   │    State: LOGGED_IN     │        │
+    │   │                         │        │
+    │   │ ❌ Server Error         │        │
+    │   │    Show error           │        │
+    │   │    Stay on Profile      │        │
+    │   │    State: LOGGED_IN     │        │
+    │   └─────────────────────────┘        │
+    │                                       │
+    └───────────────────────────────────────┘
+
+Final State (Success):
+    LOGGED_OUT → Welcome Screen
+    (User cannot log back in with deleted email)
+```
+
+---
+
+## 7. Error Handling Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   ERROR HANDLING                                │
+└─────────────────────────────────────────────────────────────────┘
+
+Edge Function Returns Error
+    ↓
+Check HTTP Status Code
+    ├─→ 400 Bad Request
+    │   └─→ Show: "Invalid request (missing data)"
+    │
+    ├─→ 401 Unauthorized
+    │   └─→ Show: "Session expired. Please sign in again"
+    │
+    ├─→ 403 Forbidden
+    │   └─→ Show: "You can only delete your own account"
+    │
+    ├─→ 500 Internal Server Error
+    │   └─→ Show: "Server error. Please try again later"
+    │
+    └─→ Network Error
+        └─→ Show: "No internet connection. Please try again"
+
+User sees Error Snackbar
+    ↓
+Options:
+    ├─→ [Dismiss] - Close error
+    ├─→ [Retry] - Try deletion again (if applicable)
+    └─→ Can continue using app or try again
+
+User Stays Logged In
+    ↓
+Account NOT Deleted
+    ↓
+User can try again or continue using app
+```
+
+---
+
+## 8. Complete Timeline
+
+```
+TIME                EVENT                           SYSTEM STATE
+────                ─────                           ────────────
+
+T+0s                User signs up                   [Account Created]
+T+5s                User completes profile          [Profile Set]
+T+10s               User navigates to profile       [Profile Page]
+T+12s               User clicks "Delete Account"    [Dialog Shows]
+T+13s               User confirms deletion          [Loading...]
+T+13.1s             POST /delete-account sent       [Network: Sending]
+T+13.5s             Edge Function received          [Server: Processing]
+T+13.6s             JWT validated ✓                 [Auth: Valid]
+T+13.7s             User ownership verified ✓       [Authz: Valid]
+T+13.8s             Delete user from auth ✓         [User: Deleted]
+T+13.9s             Cascade deletes (profiles) ✓    [DB: Cascading]
+T+13.95s            Cascade deletes (topics) ✓      [DB: Cascading]
+T+14.0s             Cascade deletes (all related) ✓ [DB: Complete]
+T+14.05s            Response sent ✓                 [Server: Done]
+T+14.1s             Sign out executed ✓             [Auth: Logged Out]
+T+14.2s             Navigate to Welcome             [Nav: Welcome]
+T+14.3s             Confirmation: Account deleted   [UI: Success]
+
+Total Time: ~1.3 seconds
+
+Account Status:
+    Before: ACTIVE
+    After: DELETED (permanently)
+    
+User Status:
+    Before: AUTHENTICATED
+    After: LOGGED OUT
+    
+Data:
+    Before: Complete profile + all content
+    After: ZERO records in database
+```
+
+---
+
+## Summary Diagram
+
+```
+                    User Deletes Account
+                            │
+                            ↓
+                  ┌─────────────────────┐
+                  │  Flutter App        │
+                  │  Profile Screen     │
+                  │  (Beautiful UI)     │
+                  └──────────┬──────────┘
+                             │
+                             ↓ POST /delete-account
+                  ┌─────────────────────┐
+                  │  Supabase Edge Fn   │
+                  │  (TypeScript)       │
+                  │  • Validate         │
+                  │  • Authenticate     │
+                  │  • Authorize        │
+                  │  • Delete User      │
+                  └──────────┬──────────┘
+                             │
+                             ↓ admin.deleteUser()
+                  ┌─────────────────────┐
+                  │  PostgreSQL DB      │
+                  │  • Delete profiles  │
+                  │  • Cascade to:      │
+                  │    - topics         │
+                  │    - suggestions    │
+                  │    - comments       │
+                  │    - votes          │
+                  │    - messages       │
+                  │    - everything     │
+                  └──────────┬──────────┘
+                             │
+                             ↓
+                  ┌─────────────────────┐
+                  │  Account DELETED    │
+                  │  User LOGGED OUT    │
+                  │  All DATA REMOVED   │
+                  │  Complete ✅        │
+                  └─────────────────────┘
+```
+
+---
+
+**Documentation Created:** February 19, 2026
+**Status:** ✅ Complete Architecture Documented
