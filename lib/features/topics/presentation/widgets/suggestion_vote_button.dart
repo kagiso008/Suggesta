@@ -24,6 +24,15 @@ class SuggestionVoteButton extends ConsumerStatefulWidget {
 class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
   bool _isVoting = false;
   bool _hasError = false;
+  int _optimisticVoteCount = 0;
+  bool _optimisticHasVoted = false;
+  bool _hasOptimisticUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _optimisticVoteCount = widget.suggestion.voteCount;
+  }
 
   Future<void> _handleVote() async {
     if (_isVoting) return;
@@ -42,26 +51,46 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
       return;
     }
 
+    // Get current vote state from provider
+    final voteProvider = ref.read(suggestionVoteProvider.notifier);
+    final currentHasVoted = voteProvider.hasVoted(widget.suggestion.id);
+
+    // Calculate new vote count optimistically
+    int newOptimisticCount = _optimisticVoteCount;
+    bool newHasVoted = currentHasVoted;
+
+    if (currentHasVoted) {
+      // Removing vote
+      newOptimisticCount = _optimisticVoteCount - 1;
+      newHasVoted = false;
+    } else {
+      // Adding vote
+      newOptimisticCount = _optimisticVoteCount + 1;
+      newHasVoted = true;
+    }
+
+    // Optimistic update
     setState(() {
       _isVoting = true;
       _hasError = false;
+      _hasOptimisticUpdate = true;
+      _optimisticHasVoted = newHasVoted;
+      _optimisticVoteCount = newOptimisticCount;
     });
 
     try {
-      final voteProvider = ref.read(suggestionVoteProvider.notifier);
-      await voteProvider.toggleVote(
-        widget.suggestion.id,
-        widget.suggestion.voteCount,
-      );
+      // Use the provider's toggleVote method
+      await voteProvider.toggleVote(widget.suggestion.id, _optimisticVoteCount);
 
-      // Also refresh the suggestions provider to reflect the new vote count
-      final suggestionsNotifier = ref.read(
-        suggestionsProvider(widget.suggestion.topicId).notifier,
-      );
-      await suggestionsNotifier.refresh();
+      // Refresh the suggestions provider to get updated vote count
+      ref.invalidate(suggestionsProvider(widget.suggestion.topicId));
     } catch (e) {
       setState(() {
         _hasError = true;
+        // Revert optimistic update on error
+        _optimisticHasVoted = currentHasVoted;
+        _optimisticVoteCount = widget.suggestion.voteCount;
+        _hasOptimisticUpdate = false;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -81,94 +110,114 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
   }
 
   @override
+  void didUpdateWidget(SuggestionVoteButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the suggestion data changed (e.g., from real-time update),
+    // reset optimistic values
+    if (widget.suggestion.id != oldWidget.suggestion.id ||
+        widget.suggestion.voteCount != oldWidget.suggestion.voteCount) {
+      setState(() {
+        _optimisticVoteCount = widget.suggestion.voteCount;
+        _hasOptimisticUpdate = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final voteState = ref.watch(suggestionVoteProvider);
-    final hasVoted = voteState.maybeWhen(
-      data: (votedSuggestionIds) =>
-          votedSuggestionIds.contains(widget.suggestion.id),
+    final serverHasVoted = voteState.maybeWhen(
+      data: (upvotedSuggestionIds) {
+        // Check if user has upvoted this suggestion
+        return upvotedSuggestionIds.contains(widget.suggestion.id);
+      },
       orElse: () => false,
     );
 
-    final voteCount = widget.suggestion.voteCount;
-    final isUpvoted = hasVoted;
+    // Use optimistic values if available, otherwise server values
+    final hasVoted = _hasOptimisticUpdate
+        ? _optimisticHasVoted
+        : serverHasVoted;
+    final voteCount = _hasOptimisticUpdate
+        ? _optimisticVoteCount
+        : widget.suggestion.voteCount;
 
     if (widget.compact) {
-      return _buildCompactVoteButton(voteCount, isUpvoted);
+      return _buildCompactVoteButton(voteCount, hasVoted);
     }
 
-    return _buildFullVoteButton(voteCount, isUpvoted);
+    return _buildFullVoteButton(voteCount, hasVoted);
   }
 
-  Widget _buildCompactVoteButton(int voteCount, bool isUpvoted) {
-    return GestureDetector(
-      onTap: _handleVote,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isUpvoted
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-              : Theme.of(context).colorScheme.surfaceVariant,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isUpvoted
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.outline.withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
+  Widget _buildCompactVoteButton(int voteCount, bool hasVoted) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Upvote button
+        GestureDetector(
+          onTap: _handleVote,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: hasVoted
+                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
               Icons.arrow_upward,
               size: 16,
-              color: isUpvoted
+              color: hasVoted
                   ? Theme.of(context).colorScheme.primary
                   : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: 4),
-            Text(
-              _formatCount(voteCount),
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: isUpvoted
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+
+        // Vote count
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            _formatCount(voteCount),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildFullVoteButton(int voteCount, bool isUpvoted) {
+  Widget _buildFullVoteButton(int voteCount, bool hasVoted) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Upvote button
         IconButton(
           onPressed: _handleVote,
           icon: Icon(
             Icons.arrow_upward,
-            color: isUpvoted
+            color: hasVoted
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,
             size: 24,
           ),
           padding: const EdgeInsets.all(8),
           constraints: const BoxConstraints(),
-          tooltip: isUpvoted ? 'Remove vote' : 'Upvote',
+          tooltip: hasVoted ? 'Remove upvote' : 'Upvote',
         ),
-        const SizedBox(height: 2),
+
+        // Vote count
         Text(
           _formatCount(voteCount),
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
-            color: isUpvoted
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
+
+        // Loading indicator
         if (_isVoting)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -183,6 +232,8 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
               ),
             ),
           ),
+
+        // Error indicator
         if (_hasError)
           Padding(
             padding: const EdgeInsets.only(top: 4),

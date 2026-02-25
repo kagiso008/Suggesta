@@ -9,6 +9,7 @@ class TopicModel {
   final List<String> tags;
   final int viewCount;
   final int voteCount;
+  final int suggestionCount;
   final String? milestoneBadge; // 'rising' | 'hot' | 'viral' | null
   final DateTime createdAt;
   final ProfileModel? author; // joined from profiles
@@ -22,6 +23,7 @@ class TopicModel {
     required this.tags,
     required this.viewCount,
     required this.voteCount,
+    required this.suggestionCount,
     this.milestoneBadge,
     required this.createdAt,
     this.author,
@@ -37,6 +39,7 @@ class TopicModel {
       tags: List<String>.from(json['tags'] ?? []),
       viewCount: (json['view_count'] as num).toInt(),
       voteCount: (json['vote_count'] as num).toInt(),
+      suggestionCount: (json['suggestion_count'] as num?)?.toInt() ?? 0,
       milestoneBadge: json['milestone_badge'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       author: json['profiles'] != null
@@ -55,6 +58,7 @@ class TopicModel {
       'tags': tags,
       'view_count': viewCount,
       'vote_count': voteCount,
+      'suggestion_count': suggestionCount,
       'milestone_badge': milestoneBadge,
       'created_at': createdAt.toIso8601String(),
       'profiles': author?.toJson(),
@@ -70,6 +74,7 @@ class TopicModel {
     List<String>? tags,
     int? viewCount,
     int? voteCount,
+    int? suggestionCount,
     String? milestoneBadge,
     DateTime? createdAt,
     ProfileModel? author,
@@ -83,6 +88,7 @@ class TopicModel {
       tags: tags ?? this.tags,
       viewCount: viewCount ?? this.viewCount,
       voteCount: voteCount ?? this.voteCount,
+      suggestionCount: suggestionCount ?? this.suggestionCount,
       milestoneBadge: milestoneBadge ?? this.milestoneBadge,
       createdAt: createdAt ?? this.createdAt,
       author: author ?? this.author,
@@ -91,7 +97,7 @@ class TopicModel {
 
   @override
   String toString() {
-    return 'TopicModel(id: $id, title: $title, voteCount: $voteCount, milestoneBadge: $milestoneBadge)';
+    return 'TopicModel(id: $id, title: $title, voteCount: $voteCount, suggestionCount: $suggestionCount, milestoneBadge: $milestoneBadge)';
   }
 
   @override
@@ -107,6 +113,7 @@ class TopicModel {
         other.tags == tags &&
         other.viewCount == viewCount &&
         other.voteCount == voteCount &&
+        other.suggestionCount == suggestionCount &&
         other.milestoneBadge == milestoneBadge &&
         other.createdAt == createdAt &&
         other.author == author;
@@ -122,6 +129,7 @@ class TopicModel {
         tags.hashCode ^
         viewCount.hashCode ^
         voteCount.hashCode ^
+        suggestionCount.hashCode ^
         milestoneBadge.hashCode ^
         createdAt.hashCode ^
         author.hashCode;

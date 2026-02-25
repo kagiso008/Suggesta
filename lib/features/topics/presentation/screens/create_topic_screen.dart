@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/topics_provider.dart';
+import '../providers/user_topics_provider.dart';
 
 class CreateTopicScreen extends ConsumerStatefulWidget {
   const CreateTopicScreen({super.key});
@@ -69,6 +71,9 @@ class _CreateTopicScreenState extends ConsumerState<CreateTopicScreen> {
       _isSubmitting = true;
     });
 
+    // Store context locally to avoid async gap issues
+    final localContext = context;
+
     try {
       final newTopic = await ref
           .read(topicsProvider.notifier)
@@ -81,21 +86,27 @@ class _CreateTopicScreenState extends ConsumerState<CreateTopicScreen> {
             tags: _tags,
           );
 
-      // Navigate to the new topic
-      if (context.mounted) {
-        context.go('/topic/${newTopic.id}');
-
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
+      // Show success message
+      if (localContext.mounted) {
+        ScaffoldMessenger.of(localContext).showSnackBar(
           const SnackBar(
             content: Text('Topic created successfully!'),
             backgroundColor: Colors.green,
           ),
         );
+
+        // Invalidate user topics provider to refresh "My Topics" page
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          ref.invalidate(userTopicsProvider(user.id));
+        }
+
+        // Navigate back to homepage
+        localContext.pop();
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (localContext.mounted) {
+        ScaffoldMessenger.of(localContext).showSnackBar(
           SnackBar(
             content: Text('Failed to create topic: ${e.toString()}'),
             backgroundColor: Colors.red,
@@ -171,7 +182,7 @@ class _CreateTopicScreenState extends ConsumerState<CreateTopicScreen> {
 
               // Category dropdown
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Category *',
                   border: OutlineInputBorder(),

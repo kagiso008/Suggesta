@@ -50,7 +50,15 @@ CREATE TABLE topic_follows (
     PRIMARY KEY (user_id, topic_id)
 );
 
--- 5. suggestions
+-- 5. topic_bookmarks
+CREATE TABLE topic_bookmarks (
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (user_id, topic_id)
+);
+
+-- 6. suggestions
 CREATE TABLE suggestions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
@@ -66,6 +74,7 @@ CREATE TABLE suggestion_votes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
     suggestion_id UUID REFERENCES suggestions(id) ON DELETE CASCADE,
+    vote_type INTEGER NOT NULL CHECK (vote_type IN (1, -1)), -- 1 for upvote, -1 for downvote
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(user_id, suggestion_id)
 );
@@ -155,6 +164,7 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topic_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topic_follows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE topic_bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE suggestions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE suggestion_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
@@ -202,7 +212,17 @@ CREATE POLICY "Authenticated users can follow topics" ON topic_follows
 CREATE POLICY "Users can unfollow topics" ON topic_follows
     FOR DELETE USING (auth.uid() = user_id);
 
--- 5. suggestions policies
+-- 5. topic_bookmarks policies
+CREATE POLICY "Users can view their own bookmarks" ON topic_bookmarks
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Authenticated users can bookmark topics" ON topic_bookmarks
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can remove their own bookmarks" ON topic_bookmarks
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- 6. suggestions policies
 CREATE POLICY "Suggestions are viewable by everyone" ON suggestions
     FOR SELECT USING (true);
 
@@ -356,12 +376,16 @@ CREATE OR REPLACE FUNCTION public.update_suggestion_vote_count()
 RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        UPDATE suggestions 
-        SET vote_count = vote_count + 1 
+        UPDATE suggestions
+        SET vote_count = vote_count + NEW.vote_type
+        WHERE id = NEW.suggestion_id;
+    ELSIF TG_OP = 'UPDATE' THEN
+        UPDATE suggestions
+        SET vote_count = vote_count - OLD.vote_type + NEW.vote_type
         WHERE id = NEW.suggestion_id;
     ELSIF TG_OP = 'DELETE' THEN
-        UPDATE suggestions 
-        SET vote_count = vote_count - 1 
+        UPDATE suggestions
+        SET vote_count = vote_count - OLD.vote_type
         WHERE id = OLD.suggestion_id;
     END IF;
     RETURN COALESCE(NEW, OLD);
@@ -369,7 +393,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER suggestion_votes_count_trigger
-    AFTER INSERT OR DELETE ON suggestion_votes
+    AFTER INSERT OR UPDATE OR DELETE ON suggestion_votes
     FOR EACH ROW EXECUTE FUNCTION public.update_suggestion_vote_count();
 
 -- 5d. messages → update conversations.last_message + updated_at
@@ -437,7 +461,17 @@ ORDER BY score DESC;
 CREATE UNIQUE INDEX idx_trending_topics_id ON trending_topics(id);
 CREATE INDEX idx_trending_topics_score ON trending_topics(score DESC);
 
--- SECTION 7: REALTIME PUBLICATION (enable tables for realtime)
+-- SECTION 7: FUNCTIONS
+
+-- Increment topic view count (called manually from Flutter)
+CREATE OR REPLACE FUNCTION increment_topic_view(topic_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE topics SET view_count = view_count + 1 WHERE id = topic_id;
+END;
+$$;
+
+-- SECTION 8: REALTIME PUBLICATION (enable tables for realtime)
 -- Enable realtime for tables that need live updates
 ALTER PUBLICATION supabase_realtime ADD TABLE topics;
 ALTER PUBLICATION supabase_realtime ADD TABLE suggestions;

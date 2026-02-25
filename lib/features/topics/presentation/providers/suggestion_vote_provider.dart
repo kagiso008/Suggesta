@@ -15,14 +15,15 @@ class SuggestionVoteNotifier extends AsyncNotifier<Set<String>> {
           .from('suggestion_votes')
           .select('suggestion_id')
           .eq('user_id', user.id)
+          .eq('vote_type', 1) // Only fetch upvotes
           .limit(1000);
 
-      final votedSuggestionIds = <String>{};
+      final upvotedSuggestionIds = <String>{};
       for (final item in response) {
         final suggestionId = item['suggestion_id'] as String;
-        votedSuggestionIds.add(suggestionId);
+        upvotedSuggestionIds.add(suggestionId);
       }
-      return votedSuggestionIds;
+      return upvotedSuggestionIds;
     } catch (e) {
       // If we can't fetch votes, return empty set
       print('Failed to fetch suggestion votes: $e');
@@ -45,25 +46,25 @@ class SuggestionVoteNotifier extends AsyncNotifier<Set<String>> {
     final state = this.state;
     if (state is! AsyncData) return;
 
-    final currentVotes = state.value ?? {};
-    final hasVoted = currentVotes.contains(suggestionId);
+    final currentUpvotes = state.value ?? {};
+    final hasUpvoted = currentUpvotes.contains(suggestionId);
 
     // Optimistic update
-    final newVotes = Set<String>.from(currentVotes);
-    if (hasVoted) {
-      newVotes.remove(suggestionId);
+    final newUpvotes = Set<String>.from(currentUpvotes);
+    if (hasUpvoted) {
+      newUpvotes.remove(suggestionId);
     } else {
-      newVotes.add(suggestionId);
+      newUpvotes.add(suggestionId);
     }
 
-    this.state = AsyncValue.data(newVotes);
+    this.state = AsyncValue.data(newUpvotes);
 
     try {
       final repository = ref.read(topicsRepositoryProvider);
       await repository.toggleSuggestionVote(suggestionId);
     } catch (e) {
       // Revert on error
-      this.state = AsyncValue.data(currentVotes);
+      this.state = AsyncValue.data(currentUpvotes);
       rethrow;
     }
   }
@@ -81,14 +82,15 @@ class SuggestionVoteNotifier extends AsyncNotifier<Set<String>> {
           .from('suggestion_votes')
           .select('suggestion_id')
           .eq('user_id', user.id)
+          .eq('vote_type', 1) // Only fetch upvotes
           .limit(1000);
 
-      final votedSuggestionIds = <String>{};
+      final upvotedSuggestionIds = <String>{};
       for (final item in response) {
         final suggestionId = item['suggestion_id'] as String;
-        votedSuggestionIds.add(suggestionId);
+        upvotedSuggestionIds.add(suggestionId);
       }
-      state = AsyncValue.data(votedSuggestionIds);
+      state = AsyncValue.data(upvotedSuggestionIds);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }

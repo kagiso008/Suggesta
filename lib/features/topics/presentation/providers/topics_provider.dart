@@ -89,3 +89,12 @@ class TopicsNotifier extends AsyncNotifier<List<TopicModel>> {
 final topicsProvider = AsyncNotifierProvider<TopicsNotifier, List<TopicModel>>(
   TopicsNotifier.new,
 );
+
+// Provides a single topic by ID
+final topicProvider = FutureProvider.family<TopicModel, String>((
+  ref,
+  topicId,
+) async {
+  final repository = ref.read(topicsRepositoryProvider);
+  return await repository.fetchTopic(topicId);
+});

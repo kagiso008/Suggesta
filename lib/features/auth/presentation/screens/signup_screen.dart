@@ -12,12 +12,14 @@ class SignupScreen extends ConsumerStatefulWidget {
 }
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
+  String? _emailError;
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   late TextEditingController _confirmPasswordController;
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  int _passwordStrength = 0;
 
   @override
   void initState() {
@@ -45,13 +47,130 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   String? _validatePassword(String password) {
     if (password.isEmpty) return 'Password is required';
-    if (password.length < 6) return 'Password must be at least 6 characters';
+
+    // Check minimum length
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters';
+    }
+
+    // Check for uppercase letter
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+
+    // Check for lowercase letter
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+
+    // Check for digit
+    if (!RegExp(r'[0-9]').hasMatch(password)) {
+      return 'Password must contain at least one number';
+    }
+
+    // Check for special character
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) {
+      return 'Password must contain at least one special character (!@#\$%^&* etc.)';
+    }
+
+    // Check for common weak passwords
+    final weakPasswords = [
+      'password',
+      '12345678',
+      'qwerty123',
+      'admin123',
+      'letmein',
+      'welcome',
+      'monkey',
+      'dragon',
+      'baseball',
+      'football',
+    ];
+    if (weakPasswords.contains(password.toLowerCase())) {
+      return 'This password is too common. Please choose a stronger one';
+    }
+
     return null;
   }
 
   String? _validatePasswordMatch(String password, String confirm) {
     if (password != confirm) return 'Passwords do not match';
     return null;
+  }
+
+  // Calculate password strength score (0-4)
+  int _calculatePasswordStrength(String password) {
+    int score = 0;
+
+    if (password.length >= 8) score++;
+    if (RegExp(r'[A-Z]').hasMatch(password)) score++;
+    if (RegExp(r'[a-z]').hasMatch(password)) score++;
+    if (RegExp(r'[0-9]').hasMatch(password)) score++;
+    if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) score++;
+
+    return score;
+  }
+
+  // Get password strength description
+  String _getPasswordStrengthDescription(int score) {
+    switch (score) {
+      case 0:
+      case 1:
+        return 'Very Weak';
+      case 2:
+        return 'Weak';
+      case 3:
+        return 'Fair';
+      case 4:
+        return 'Good';
+      case 5:
+        return 'Strong';
+      default:
+        return 'Very Weak';
+    }
+  }
+
+  // Get password strength color
+  Color _getPasswordStrengthColor(int score) {
+    switch (score) {
+      case 0:
+      case 1:
+        return const Color(0xFFEF4444); // Red
+      case 2:
+        return const Color(0xFFF59E0B); // Amber
+      case 3:
+        return const Color(0xFFEAB308); // Yellow
+      case 4:
+        return const Color(0xFF10B981); // Emerald
+      case 5:
+        return const Color(0xFF059669); // Green
+      default:
+        return const Color(0xFFEF4444);
+    }
+  }
+
+  // Build requirement check widget
+  Widget _buildRequirementCheck(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.circle_outlined,
+            size: 14,
+            color: isMet ? const Color(0xFF10B981) : const Color(0xFF9CA3AF),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: isMet ? const Color(0xFF10B981) : const Color(0xFF9CA3AF),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleSignup() async {
@@ -63,6 +182,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     final emailError = _validateEmail(email);
     final passwordError = _validatePassword(password);
     final matchError = _validatePasswordMatch(password, confirmPassword);
+
+    setState(() {
+      _emailError = emailError;
+    });
 
     if (emailError != null || passwordError != null || matchError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -181,6 +304,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               // Email Field
               TextField(
                 controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                onChanged: (value) {
+                  setState(() {
+                    _emailError = _validateEmail(value.trim());
+                  });
+                },
                 decoration: InputDecoration(
                   hintText: 'Email address',
                   hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
@@ -205,6 +334,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     horizontal: 16,
                     vertical: 12,
                   ),
+                  errorText: _emailError,
                 ),
               ),
 
@@ -214,6 +344,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
+                onChanged: (value) {
+                  setState(() {
+                    _passwordStrength = _calculatePasswordStrength(value);
+                  });
+                },
                 decoration: InputDecoration(
                   hintText: 'Password',
                   hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
@@ -250,6 +385,70 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                 ),
               ),
+
+              const SizedBox(height: 8),
+
+              // Password Strength Indicator
+              if (_passwordController.text.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Strength label and bar
+                    Row(
+                      children: [
+                        Expanded(
+                          child: LinearProgressIndicator(
+                            value: _passwordStrength / 5,
+                            backgroundColor: const Color(0xFFE5E7EB),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _getPasswordStrengthColor(_passwordStrength),
+                            ),
+                            minHeight: 6,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _getPasswordStrengthDescription(_passwordStrength),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _getPasswordStrengthColor(_passwordStrength),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Requirements checklist
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildRequirementCheck(
+                          'At least 8 characters',
+                          _passwordController.text.length >= 8,
+                        ),
+                        _buildRequirementCheck(
+                          'Contains uppercase letter',
+                          RegExp(r'[A-Z]').hasMatch(_passwordController.text),
+                        ),
+                        _buildRequirementCheck(
+                          'Contains lowercase letter',
+                          RegExp(r'[a-z]').hasMatch(_passwordController.text),
+                        ),
+                        _buildRequirementCheck(
+                          'Contains number',
+                          RegExp(r'[0-9]').hasMatch(_passwordController.text),
+                        ),
+                        _buildRequirementCheck(
+                          'Contains special character',
+                          RegExp(
+                            r'[!@#$%^&*(),.?":{}|<>]',
+                          ).hasMatch(_passwordController.text),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
 
               const SizedBox(height: 16),
 

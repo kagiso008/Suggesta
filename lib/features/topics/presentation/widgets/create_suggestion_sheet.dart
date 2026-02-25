@@ -4,17 +4,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/topics_provider.dart';
 import '../providers/suggestions_provider.dart';
 
+typedef SuggestionAddedCallback = void Function();
+
 class CreateSuggestionSheet extends ConsumerStatefulWidget {
   final String topicId;
+  final SuggestionAddedCallback? onSuggestionAdded;
 
-  const CreateSuggestionSheet({super.key, required this.topicId});
+  const CreateSuggestionSheet({
+    super.key,
+    required this.topicId,
+    this.onSuggestionAdded,
+  });
 
-  static Future<void> show(BuildContext context, String topicId) async {
+  static Future<void> show(
+    BuildContext context,
+    String topicId, {
+    SuggestionAddedCallback? onSuggestionAdded,
+  }) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => CreateSuggestionSheet(topicId: topicId),
+      builder: (context) => CreateSuggestionSheet(
+        topicId: topicId,
+        onSuggestionAdded: onSuggestionAdded,
+      ),
     );
   }
 
@@ -53,6 +67,9 @@ class _CreateSuggestionSheetState extends ConsumerState<CreateSuggestionSheet> {
 
       if (mounted) {
         Navigator.of(context).pop();
+        if (widget.onSuggestionAdded != null) {
+          widget.onSuggestionAdded!();
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Suggestion added successfully!'),

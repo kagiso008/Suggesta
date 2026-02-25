@@ -12,17 +12,24 @@ import '../../features/topics/presentation/screens/home_feed_screen.dart';
 import '../../features/topics/presentation/screens/topic_detail_screen.dart';
 import '../../features/topics/presentation/screens/create_topic_screen.dart';
 import '../../features/topics/presentation/screens/search_screen.dart';
+import '../../features/topics/presentation/screens/user_topics_screen.dart';
 import '../../features/trending/presentation/screens/trending_screen.dart';
 import '../../features/chat/presentation/screens/chat_inbox_screen.dart';
 import '../../features/chat/presentation/screens/chat_room_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
+import '../../features/topics/presentation/screens/bookmarks_screen.dart';
 import '../../shared/widgets/bottom_nav.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     routes: [
+      GoRoute(
+        path: '/my-topics',
+        name: 'my-topics',
+        builder: (context, state) => const UserTopicsScreen(),
+      ),
       // Splash screen
       GoRoute(
         path: '/splash',
@@ -140,6 +147,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/notifications',
         name: 'notifications',
         builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/bookmarks',
+        name: 'bookmarks',
+        builder: (context, state) => const BookmarksScreen(),
       ),
     ],
     redirect: (context, state) {

@@ -49,8 +49,16 @@ CREATE TABLE IF NOT EXISTS suggestion_votes (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   suggestion_id  uuid REFERENCES suggestions(id) ON DELETE CASCADE NOT NULL,
+  vote_type      integer NOT NULL CHECK (vote_type IN (1, -1)), -- 1 for upvote, -1 for downvote
   created_at     timestamptz DEFAULT now(),
   UNIQUE(user_id, suggestion_id)
+);
+
+CREATE TABLE IF NOT EXISTS topic_bookmarks (
+  user_id     uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  topic_id    uuid REFERENCES topics(id) ON DELETE CASCADE NOT NULL,
+  created_at  timestamptz DEFAULT now(),
+  PRIMARY KEY (user_id, topic_id)
 );
 
 
@@ -79,6 +87,7 @@ ALTER TABLE topics          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topic_votes     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE suggestions     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE suggestion_votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE topic_bookmarks ENABLE ROW LEVEL SECURITY;
 
 -- profiles
 CREATE POLICY "Public profiles are viewable by everyone"
@@ -135,6 +144,16 @@ CREATE POLICY "Authenticated users can vote on suggestions"
 
 CREATE POLICY "Users can remove their own suggestion vote"
   ON suggestion_votes FOR DELETE USING (auth.uid() = user_id);
+
+-- topic_bookmarks
+CREATE POLICY "Users can view their own bookmarks"
+  ON topic_bookmarks FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Authenticated users can bookmark topics"
+  ON topic_bookmarks FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can remove their own bookmarks"
+  ON topic_bookmarks FOR DELETE USING (auth.uid() = user_id);
 
 
 -- ─── SECTION 4: FUNCTIONS & TRIGGERS ─────────────────────────
@@ -205,11 +224,15 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     UPDATE suggestions
-    SET vote_count = vote_count + 1
+    SET vote_count = vote_count + NEW.vote_type
+    WHERE id = NEW.suggestion_id;
+  ELSIF TG_OP = 'UPDATE' THEN
+    UPDATE suggestions
+    SET vote_count = vote_count - OLD.vote_type + NEW.vote_type
     WHERE id = NEW.suggestion_id;
   ELSIF TG_OP = 'DELETE' THEN
     UPDATE suggestions
-    SET vote_count = GREATEST(vote_count - 1, 0)
+    SET vote_count = vote_count - OLD.vote_type
     WHERE id = OLD.suggestion_id;
   END IF;
   RETURN COALESCE(NEW, OLD);
@@ -218,7 +241,7 @@ $$;
 
 DROP TRIGGER IF EXISTS on_suggestion_vote_change ON suggestion_votes;
 CREATE TRIGGER on_suggestion_vote_change
-  AFTER INSERT OR DELETE ON suggestion_votes
+  AFTER INSERT OR UPDATE OR DELETE ON suggestion_votes
   FOR EACH ROW EXECUTE FUNCTION handle_suggestion_vote_change();
 
 

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/topic_model.dart';
-import 'topic_vote_button.dart';
+import '../providers/bookmarks_provider.dart';
 
-class TopicCard extends StatelessWidget {
+class TopicCard extends ConsumerWidget {
   final TopicModel topic;
   final VoidCallback onTap;
 
@@ -83,7 +83,32 @@ class TopicCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isBookmarked = ref.watch(
+      bookmarksProvider.select(
+        (bookmarks) => bookmarks.maybeWhen(
+          data: (topics) => topics.any((t) => t.id == topic.id),
+          orElse: () => false,
+        ),
+      ),
+    );
+
+    Future<void> toggleBookmark() async {
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      try {
+        final notifier = ref.read(bookmarksProvider.notifier);
+        await notifier.toggleBookmark(topic.id);
+      } catch (e) {
+        // Show error snackbar
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Failed to toggle bookmark: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
       child: InkWell(
@@ -199,13 +224,6 @@ class TopicCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Vote button and count
-                  Consumer(
-                    builder: (context, ref, child) {
-                      return TopicVoteButton(topic: topic, compact: true);
-                    },
-                  ),
-
                   // Suggestions count
                   Row(
                     children: [
@@ -216,7 +234,7 @@ class TopicCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '💡 0', // Placeholder - we'll need to fetch suggestion count
+                        '💡 ${topic.suggestionCount}',
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontWeight: FontWeight.w500,
@@ -242,6 +260,21 @@ class TopicCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+
+                  // Bookmark button
+                  IconButton(
+                    onPressed: toggleBookmark,
+                    icon: Icon(
+                      isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
+                      size: 20,
+                      color: isBookmarked ? Colors.amber : Colors.grey[600],
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: isBookmarked
+                        ? 'Remove bookmark'
+                        : 'Bookmark topic',
                   ),
                 ],
               ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/topics_provider.dart';
 import '../providers/suggestions_provider.dart';
 import '../widgets/suggestion_card.dart';
+import '../widgets/create_suggestion_sheet.dart';
 import '../../models/topic_model.dart';
 
 class TopicDetailScreen extends ConsumerStatefulWidget {
@@ -23,6 +24,10 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    // Increment view count when topic is viewed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _incrementViewCount();
+    });
   }
 
   @override
@@ -54,50 +59,29 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
   }
 
   void _showCreateSuggestionSheet() {
-    // TODO: Implement CreateSuggestionSheet
-    // For now, show a placeholder dialog
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Suggestion'),
-        content: const Text(
-          'CreateSuggestionSheet widget will be implemented in the next step.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+    CreateSuggestionSheet.show(
+      context,
+      widget.topicId,
+      onSuggestionAdded: () {
+        ref.read(suggestionsProvider(widget.topicId).notifier).refresh();
+      },
     );
+  }
+
+  Future<void> _incrementViewCount() async {
+    try {
+      final repository = ref.read(topicsRepositoryProvider);
+      await repository.incrementViewCount(widget.topicId);
+    } catch (e) {
+      // Silently fail - view count increment is non-critical
+      print('Failed to increment view count: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final topicsAsync = ref.watch(topicsProvider);
+    final topicAsync = ref.watch(topicProvider(widget.topicId));
     final suggestionsAsync = ref.watch(suggestionsProvider(widget.topicId));
-
-    // Find the topic from the topics list
-    TopicModel? topic;
-    if (topicsAsync is AsyncData) {
-      topic = topicsAsync.value?.firstWhere(
-        (t) => t.id == widget.topicId,
-        orElse: () => TopicModel(
-          id: widget.topicId,
-          title: 'Loading...',
-          description: '',
-          category: 'general',
-          tags: [],
-          voteCount: 0,
-          viewCount: 0,
-          milestoneBadge: null,
-          createdAt: DateTime.now(),
-          userId: '',
-          author: null,
-        ),
-      );
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -113,7 +97,8 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await ref.read(topicsProvider.notifier).refresh();
+          // Invalidate the topic provider to force a fresh fetch
+          ref.invalidate(topicProvider(widget.topicId));
           await ref
               .read(suggestionsProvider(widget.topicId).notifier)
               .refresh();
@@ -123,12 +108,45 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
           slivers: [
             // Topic header
             SliverToBoxAdapter(
-              child: topic != null
-                  ? _buildTopicHeader(topic)
-                  : const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator()),
+              child: topicAsync.when(
+                data: (topic) => _buildTopicHeader(
+                  topic,
+                  suggestionsAsync.maybeWhen(
+                    data: (suggestions) => suggestions.length,
+                    orElse: () => 0,
+                  ),
+                ),
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, stackTrace) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Failed to load topic',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          error.toString(),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
+                  ),
+                ),
+              ),
             ),
 
             // Suggestions header
@@ -270,7 +288,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     );
   }
 
-  Widget _buildTopicHeader(TopicModel topic) {
+  Widget _buildTopicHeader(TopicModel topic, int suggestionCount) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -392,17 +410,11 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
 
           // Stats row
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildStatItem(
-                icon: Icons.arrow_upward,
-                value: topic.voteCount.toString(),
-                label: 'Votes',
-              ),
-              _buildStatItem(
                 icon: Icons.lightbulb_outline,
-                value:
-                    '0', // Placeholder - we don't have suggestionCount in TopicModel
+                value: suggestionCount.toString(),
                 label: 'Suggestions',
               ),
               _buildStatItem(

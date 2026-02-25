@@ -9,12 +9,18 @@ import 'topics_provider.dart';
 
 class SuggestionsNotifier
     extends FamilyAsyncNotifier<List<SuggestionModel>, String> {
-  late final String topicId;
+  String? _topicId;
   StreamSubscription? _subscription;
+
+  String get topicId {
+    assert(_topicId != null, 'topicId accessed before build');
+    return _topicId!;
+  }
 
   @override
   Future<List<SuggestionModel>> build(String arg) async {
-    topicId = arg;
+    // Only set topicId if it hasn't been set yet
+    _topicId ??= arg;
 
     // Fetch initial suggestions
     final repository = ref.read(topicsRepositoryProvider);
@@ -65,11 +71,11 @@ class SuggestionsNotifier
       return realtimeSuggestion;
     }).toList();
 
-    // 3. Sort: vote_count DESC, then created_at ASC (older first for ties)
+    // 3. Sort: vote_count DESC, then created_at DESC (newer first for ties)
     mergedSuggestions.sort((a, b) {
       final voteCmp = b.voteCount.compareTo(a.voteCount);
       if (voteCmp != 0) return voteCmp;
-      return a.createdAt.compareTo(b.createdAt); // tie-break: older first
+      return b.createdAt.compareTo(a.createdAt); // tie-break: newer first
     });
 
     // 4. Update state with the sorted list
@@ -98,7 +104,7 @@ class SuggestionsNotifier
           updatedSuggestions.sort((a, b) {
             final voteCmp = b.voteCount.compareTo(a.voteCount);
             if (voteCmp != 0) return voteCmp;
-            return a.createdAt.compareTo(b.createdAt);
+            return b.createdAt.compareTo(a.createdAt); // tie-break: newer first
           });
           state = AsyncValue.data(updatedSuggestions);
         }

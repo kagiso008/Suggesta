@@ -1,5 +1,14 @@
 # Delete Account - Debugging Checklist
 
+## 🆕 Recent Security Improvements (Updated 2026-02-24)
+
+The delete account feature has been enhanced with additional security measures:
+
+1. **✅ JWT Validation in Edge Function**: The edge function now validates JWT tokens to ensure users can only delete their own accounts.
+2. **✅ Two-Step Confirmation**: Users must confirm deletion twice - first with a standard confirmation, then with password entry.
+3. **✅ Enhanced Avatar Cleanup**: Better handling of avatar file deletion with improved error logging.
+4. **✅ Better Error Messages**: More user-friendly error messages in the Flutter UI.
+
 ## 🔴 Current Issue
 **Error:** "Invalid JWT / Unauthorized (401)"
 
@@ -9,6 +18,7 @@ This means the Edge Function is not accepting the JWT token. Common causes:
 2. ❌ **Token is expired**
 3. ❌ **Authorization header not being sent properly**
 4. ❌ **Edge Function can't access Supabase environment variables**
+5. ❌ **JWT validation failed** (User trying to delete another user's account)
 
 ---
 

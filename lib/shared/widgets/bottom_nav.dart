@@ -11,7 +11,16 @@ class ScaffoldWithBottomNav extends StatefulWidget {
 }
 
 class _ScaffoldWithBottomNavState extends State<ScaffoldWithBottomNav> {
-  int _currentIndex = 0;
+  int _getCurrentIndex(BuildContext context) {
+    final location = GoRouterState.of(context).uri.toString();
+    // Find the first route that matches the start of the location
+    for (int i = 0; i < _routes.length; i++) {
+      if (location.startsWith(_routes[i])) {
+        return i;
+      }
+    }
+    return 0;
+  }
 
   final List<BottomNavigationBarItem> _navItems = const [
     BottomNavigationBarItem(
@@ -23,11 +32,6 @@ class _ScaffoldWithBottomNavState extends State<ScaffoldWithBottomNav> {
       icon: Icon(Icons.local_fire_department_outlined),
       activeIcon: Icon(Icons.local_fire_department),
       label: 'Trending',
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.add_circle_outline),
-      activeIcon: Icon(Icons.add_circle),
-      label: 'Create',
     ),
     BottomNavigationBarItem(
       icon: Icon(Icons.chat_outlined),
@@ -44,21 +48,19 @@ class _ScaffoldWithBottomNavState extends State<ScaffoldWithBottomNav> {
   final List<String> _routes = [
     '/home/feed',
     '/home/trending',
-    '/home/create',
     '/home/chats',
     '/home/profile',
   ];
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = _getCurrentIndex(context);
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
+        currentIndex: currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          // Always replace the stack for smooth tab navigation
           context.go(_routes[index]);
         },
         items: _navItems,

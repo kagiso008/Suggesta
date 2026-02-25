@@ -11,6 +11,47 @@ interface DeleteAccountResponse {
   deletedAt?: string;
 }
 
+// JWT validation function
+async function validateJWTAndUserId(authHeader: string, requestedUserId: string): Promise<{ isValid: boolean; error?: string }> {
+  try {
+    // Extract token from "Bearer <token>" format
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Create a client to verify the JWT
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return { isValid: false, error: "Server configuration error" };
+    }
+    
+    const client = createClient(supabaseUrl, supabaseAnonKey);
+    
+    // Verify the JWT token
+    const { data: { user }, error } = await client.auth.getUser(token);
+    
+    if (error) {
+      console.error("[DELETE-ACCOUNT] JWT validation error:", error.message);
+      return { isValid: false, error: "Invalid or expired authentication token" };
+    }
+    
+    if (!user) {
+      return { isValid: false, error: "User not found in token" };
+    }
+    
+    // Verify the user in the token matches the requested user ID
+    if (user.id !== requestedUserId) {
+      console.error(`[DELETE-ACCOUNT] User ID mismatch: Token user=${user.id}, Requested user=${requestedUserId}`);
+      return { isValid: false, error: "You can only delete your own account" };
+    }
+    
+    return { isValid: true };
+  } catch (error) {
+    console.error("[DELETE-ACCOUNT] JWT validation exception:", error);
+    return { isValid: false, error: "Authentication validation failed" };
+  }
+}
+
 serve(async (req: Request) => {
   console.log("[DELETE-ACCOUNT] ========== REQUEST RECEIVED ==========");
   console.log("[DELETE-ACCOUNT] Method:", req.method);
@@ -93,6 +134,28 @@ serve(async (req: Request) => {
       );
     }
 
+    // Validate JWT token and ensure user can only delete their own account
+    console.log("[DELETE-ACCOUNT] Validating JWT token...");
+    const validationResult = await validateJWTAndUserId(authHeader, userId);
+    
+    if (!validationResult.isValid) {
+      console.error("[DELETE-ACCOUNT] ❌ JWT validation failed:", validationResult.error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: validationResult.error || "Authentication failed",
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+    console.log("[DELETE-ACCOUNT] ✅ JWT validation passed");
+
     // Create Supabase admin client (with service role key)
     console.log("[DELETE-ACCOUNT] Creating Supabase admin client...");
     
@@ -125,11 +188,6 @@ serve(async (req: Request) => {
     );
     console.log("[DELETE-ACCOUNT] ✅ Admin client created");
 
-    // Note: In a production app, you should validate the JWT token here
-    // to ensure the user is authenticated and owns the account.
-    // For simplicity, we're trusting the request since it passed Supabase's
-    // built-in JWT validation to reach this edge function.
-
     // Step 1: Delete user's avatar files from storage (if avatars bucket exists)
     console.log("[DELETE-ACCOUNT] Attempting to delete user's avatar files...");
     try {
@@ -138,27 +196,48 @@ serve(async (req: Request) => {
         .list();
 
       if (listError) {
-        console.warn("[DELETE-ACCOUNT] Could not list avatar files (bucket may not exist):", listError.message);
-      } else {
-        // Filter files that start with the user's ID
-        const userFiles = files.filter(file => file.name.startsWith(`${userId}_`));
-        console.log(`[DELETE-ACCOUNT] Found ${userFiles.length} avatar files to delete`);
+        console.warn("[DELETE-ACCOUNT] Could not list avatar files (bucket may not exist or no permissions):", listError.message);
+        console.warn("[DELETE-ACCOUNT] This is not critical - continuing with account deletion...");
+      } else if (files && files.length > 0) {
+        // Filter files that belong to the user
+        // Look for files that start with the user's ID or contain the user's ID
+        const userFiles = files.filter(file =>
+          file.name.startsWith(`${userId}_`) ||
+          file.name.includes(userId) ||
+          file.name.match(new RegExp(`^${userId}[^a-zA-Z0-9]`))
+        );
         
-        // Delete each file
-        for (const file of userFiles) {
-          const { error: deleteFileError } = await adminClient.storage
-            .from("avatars")
-            .remove([file.name]);
+        console.log(`[DELETE-ACCOUNT] Found ${userFiles.length} avatar files to delete out of ${files.length} total files`);
+        
+        if (userFiles.length > 0) {
+          // Delete each file
+          let deletedCount = 0;
+          let failedCount = 0;
           
-          if (deleteFileError) {
-            console.warn(`[DELETE-ACCOUNT] Failed to delete avatar file ${file.name}:`, deleteFileError.message);
-          } else {
-            console.log(`[DELETE-ACCOUNT] ✅ Deleted avatar file: ${file.name}`);
+          for (const file of userFiles) {
+            const { error: deleteFileError } = await adminClient.storage
+              .from("avatars")
+              .remove([file.name]);
+            
+            if (deleteFileError) {
+              console.warn(`[DELETE-ACCOUNT] Failed to delete avatar file ${file.name}:`, deleteFileError.message);
+              failedCount++;
+            } else {
+              console.log(`[DELETE-ACCOUNT] ✅ Deleted avatar file: ${file.name}`);
+              deletedCount++;
+            }
           }
+          
+          console.log(`[DELETE-ACCOUNT] Avatar cleanup summary: ${deletedCount} deleted, ${failedCount} failed`);
+        } else {
+          console.log("[DELETE-ACCOUNT] No avatar files found for this user");
         }
+      } else {
+        console.log("[DELETE-ACCOUNT] No files in avatars bucket");
       }
     } catch (storageError) {
       console.warn("[DELETE-ACCOUNT] Error during avatar cleanup:", storageError);
+      console.warn("[DELETE-ACCOUNT] Continuing with account deletion despite avatar cleanup error");
       // Continue with account deletion even if avatar cleanup fails
     }
 
