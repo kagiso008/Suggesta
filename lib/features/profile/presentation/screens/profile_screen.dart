@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
+import '../../../../shared/widgets/app_toast.dart';
 import '../../../../shared/widgets/bouncing_logo.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -127,12 +128,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _isUploadingAvatar = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile picture updated successfully'),
-          backgroundColor: Color(0xFF10B981),
-          duration: Duration(seconds: 2),
-        ),
+      AppToast.showSuccess(
+        context: context,
+        message: 'Profile picture updated successfully',
       );
     } catch (e) {
       setState(() {
@@ -154,13 +152,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             'Permission denied. Make sure you are logged in and the storage bucket has proper RLS policies.';
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: const Color(0xFFEF4444),
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      AppToast.showError(context: context, message: errorMessage);
     }
   }
 
@@ -176,12 +168,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _isEditing = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully'),
-          backgroundColor: Color(0xFF10B981),
-          duration: Duration(seconds: 2),
-        ),
+      AppToast.showSuccess(
+        context: context,
+        message: 'Profile updated successfully',
       );
     } catch (e) {
       String errorMessage = 'Failed to update profile: $e';
@@ -197,13 +186,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         errorMessage = 'Username cannot be empty. Please enter a username.';
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: const Color(0xFFEF4444),
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      AppToast.showError(context: context, message: errorMessage);
     }
   }
 
@@ -237,12 +220,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           context.go('/welcome');
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sign out failed: $e'),
-            backgroundColor: const Color(0xFFEF4444),
-          ),
-        );
+        AppToast.showError(context: context, message: 'Sign out failed: $e');
       }
     }
   }
@@ -264,12 +242,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (currentUser == null) {
       developer.log('[PROFILE-SCREEN] ❌ No current user found');
       if (mounted) {
-        ScaffoldMessenger.of(localContext).showSnackBar(
-          const SnackBar(
-            content: Text('User not found'),
-            backgroundColor: Color(0xFFEF4444),
-          ),
-        );
+        AppToast.showError(context: localContext, message: 'User not found');
       }
       return;
     }
@@ -368,11 +341,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ? null
                       : () async {
                           if (passwordController.text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enter your password'),
-                                backgroundColor: Color(0xFFEF4444),
-                              ),
+                            AppToast.showError(
+                              context: context,
+                              message: 'Please enter your password',
                             );
                             return;
                           }
@@ -434,14 +405,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         developer.log('[PROFILE-SCREEN] Stack trace: $stackTrace');
 
         if (mounted) {
-          ScaffoldMessenger.of(localContext).showSnackBar(
-            SnackBar(
-              content: Text(
+          AppToast.showError(
+            context: localContext,
+            message:
                 'Failed to delete account: ${e.toString().replaceAll('Exception: ', '')}',
-              ),
-              backgroundColor: const Color(0xFFEF4444),
-              duration: const Duration(seconds: 5),
-            ),
           );
         }
       }
@@ -492,8 +459,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Beautiful Header Section with Gradient
+            // Beautiful Header Section with Gradient (Profile Information Only)
             Container(
+              width: double.infinity,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -504,12 +472,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   end: Alignment.bottomRight,
                 ),
               ),
-              padding: const EdgeInsets.only(
-                left: 24,
-                right: 24,
-                top: 48,
-                bottom: 40,
-              ),
+              padding: const EdgeInsets.only(top: 48, bottom: 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -658,86 +621,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-
-                  // Edit Profile Button in Header
-                  const SizedBox(height: 24),
-                  if (!_isEditing) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => setState(() => _isEditing = true),
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Edit Profile'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF6366F1),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          context.push('/my-topics');
-                        },
-                        icon: const Icon(Icons.forum_outlined),
-                        label: const Text('My Topics'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF6366F1),
-                          side: const BorderSide(color: Color(0xFF6366F1)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ] else
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _handleSaveProfile,
-                            icon: const Icon(Icons.check_circle_outlined),
-                            label: const Text('Save'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF10B981),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => setState(() => _isEditing = false),
-                            icon: const Icon(Icons.close),
-                            label: const Text('Cancel'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(color: Colors.white),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                 ],
               ),
             ),
 
-            // Content Section
+            // Content Section - Profile Information Only
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -808,6 +696,75 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                   const SizedBox(height: 32),
 
+                  // Actions Section Header
+                  Text(
+                    'Actions',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Edit Profile / Save/Cancel Buttons
+                  if (!_isEditing)
+                    _buildActionButton(
+                      label: 'Edit Profile',
+                      backgroundColor: const Color(0xFF6366F1),
+                      onPressed: () => setState(() => _isEditing = true),
+                      icon: Icons.edit_outlined,
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildActionButton(
+                            label: 'Save',
+                            backgroundColor: const Color(0xFF10B981),
+                            onPressed: _handleSaveProfile,
+                            icon: Icons.check_circle_outlined,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  setState(() => _isEditing = false),
+                              icon: const Icon(Icons.close),
+                              label: const Text('Cancel'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF6B7280),
+                                side: BorderSide(color: Colors.grey.shade300),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // My Topics Button
+                  _buildActionButton(
+                    label: 'My Topics',
+                    backgroundColor: const Color(0xFF8B5CF6),
+                    onPressed: () {
+                      context.push('/my-topics');
+                    },
+                    icon: Icons.forum_outlined,
+                  ),
+
+                  const SizedBox(height: 16),
+
                   // Bookmarks Button
                   _buildActionButton(
                     label: 'Bookmarks',
@@ -818,9 +775,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     icon: Icons.bookmark_outline,
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 32),
 
-                  // Account Actions Section
+                  // Account Settings Section Header
                   Text(
                     'Account Settings',
                     style: TextStyle(

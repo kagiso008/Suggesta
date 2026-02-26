@@ -1,0 +1,47 @@
+# Firebase service account (contains private keys)
+firebase-service-account.json
+*.json
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+
+# Android/iOS build files
+android/.gradle
+android/.idea
+android/app/build
+android/build
+ios/Pods
+ios/.symlinks
+ios/DerivedData
+
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+
+# Supabase local
+.supabase/

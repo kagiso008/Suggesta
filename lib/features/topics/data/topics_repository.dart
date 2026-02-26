@@ -177,7 +177,8 @@ class TopicsRepository {
     }
   }
 
-  // Check if current user has voted on a suggestion and get vote type
+  // Check if current user has liked a suggestion
+  // In like-only system, returns 1 if liked, null if not liked
   Future<int?> getSuggestionVote(String suggestionId) async {
     try {
       final user = _supabase.auth.currentUser;
@@ -190,7 +191,10 @@ class TopicsRepository {
           .eq('suggestion_id', suggestionId)
           .maybeSingle();
 
-      return response != null ? response['vote_type'] as int : null;
+      if (response == null) return null;
+
+      // In like-only system, vote_type is always 1 if record exists
+      return 1;
     } catch (e) {
       throw Exception('Failed to get suggestion vote: $e');
     }
@@ -215,7 +219,8 @@ class TopicsRepository {
     }
   }
 
-  // Downvote a suggestion
+  // Downvote a suggestion - deprecated in like-only system
+  // Now removes the like (if exists) to maintain backward compatibility
   Future<void> downvoteSuggestion(String suggestionId) async {
     try {
       final user = _supabase.auth.currentUser;
@@ -223,14 +228,14 @@ class TopicsRepository {
         throw Exception('User must be authenticated to vote');
       }
 
-      // Upsert with vote_type = -1 (downvote)
-      await _supabase.from('suggestion_votes').upsert({
-        'user_id': user.id,
-        'suggestion_id': suggestionId,
-        'vote_type': -1,
-      }, onConflict: 'user_id,suggestion_id');
+      // In like-only system, downvote means remove the like if it exists
+      await _supabase
+          .from('suggestion_votes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('suggestion_id', suggestionId);
     } catch (e) {
-      throw Exception('Failed to downvote suggestion: $e');
+      throw Exception('Failed to remove suggestion like: $e');
     }
   }
 
@@ -252,18 +257,50 @@ class TopicsRepository {
     }
   }
 
+  // Toggle suggestion like using RPC function (new like-only system)
+  // Returns a map with 'new_vote_count' and 'has_voted' keys
+  Future<Map<String, dynamic>> toggleSuggestionLike(String suggestionId) async {
+    try {
+      print(
+        '[DEBUG] toggleSuggestionLike called for suggestion: $suggestionId',
+      );
+      final response = await _supabase
+          .rpc(
+            'toggle_suggestion_like',
+            params: {'suggestion_id': suggestionId},
+          )
+          .single();
+
+      print('[DEBUG] toggleSuggestionLike response: $response');
+      return {
+        'new_vote_count': response['new_vote_count'] as int,
+        'has_voted': response['has_voted'] as bool,
+      };
+    } catch (e, stackTrace) {
+      print(
+        '[ERROR] toggleSuggestionLike failed for suggestion $suggestionId: $e',
+      );
+      print('[ERROR] Stack trace: $stackTrace');
+      throw Exception('Failed to toggle suggestion like: $e');
+    }
+  }
+
   // Toggle suggestion vote — kept for backward compatibility (upvote/remove)
+  // Now uses the new RPC function for consistency
   Future<bool> toggleSuggestionVote(String suggestionId) async {
     try {
-      final currentVote = await getSuggestionVote(suggestionId);
-      if (currentVote == null) {
-        await upvoteSuggestion(suggestionId);
-        return true;
-      } else {
-        await removeSuggestionVote(suggestionId);
-        return false;
-      }
-    } catch (e) {
+      print(
+        '[DEBUG] toggleSuggestionVote called for suggestion: $suggestionId',
+      );
+      final result = await toggleSuggestionLike(suggestionId);
+      final hasVoted = result['has_voted'] as bool;
+      print('[DEBUG] toggleSuggestionVote result: has_voted = $hasVoted');
+      return hasVoted;
+    } catch (e, stackTrace) {
+      print(
+        '[ERROR] toggleSuggestionVote failed for suggestion $suggestionId: $e',
+      );
+      print('[ERROR] Stack trace: $stackTrace');
       throw Exception('Failed to toggle suggestion vote: $e');
     }
   }
@@ -411,6 +448,20 @@ class TopicsRepository {
       return topics;
     } catch (e) {
       throw Exception('Failed to fetch bookmarked topics: $e');
+    }
+  }
+
+  // Clear all bookmarks for the current user
+  Future<void> clearAllBookmarks() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('User must be authenticated to clear bookmarks');
+      }
+
+      await _supabase.from('topic_bookmarks').delete().eq('user_id', user.id);
+    } catch (e) {
+      throw Exception('Failed to clear bookmarks: $e');
     }
   }
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/models/suggestion_model.dart';
 import 'suggestion_vote_button.dart';
@@ -61,15 +60,6 @@ class SuggestionCard extends StatelessWidget {
     } else {
       return 'Just now';
     }
-  }
-
-  String _formatVoteCount(int count) {
-    if (count >= 1000000) {
-      return '${(count / 1000000).toStringAsFixed(1)}M';
-    } else if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(1)}K';
-    }
-    return count.toString();
   }
 
   @override
@@ -245,47 +235,11 @@ class SuggestionCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Vote count
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.arrow_upward,
-                                  size: 16,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatVoteCount(suggestion.voteCount),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SuggestionVoteButton(
-                            suggestion: suggestion,
-                            compact: true,
-                          ),
-                        ],
+                      // Like button with count - using SuggestionVoteButton in compact mode
+                      // This shows the thumb up/down icon and vote count
+                      SuggestionVoteButton(
+                        suggestion: suggestion,
+                        compact: true,
                       ),
 
                       // Reply button

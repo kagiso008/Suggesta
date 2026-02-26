@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/topics_repository.dart';
 import '../../models/topic_model.dart';
 import 'topics_provider.dart';
 
@@ -44,6 +43,17 @@ class BookmarksNotifier extends AsyncNotifier<List<TopicModel>> {
     } catch (e) {
       // If we can't check, assume not bookmarked
       return false;
+    }
+  }
+
+  Future<void> clearAllBookmarks() async {
+    try {
+      final repository = ref.read(topicsRepositoryProvider);
+      await repository.clearAllBookmarks();
+      // After clearing, refresh the list
+      await refresh();
+    } catch (e) {
+      throw Exception('Failed to clear all bookmarks: $e');
     }
   }
 }

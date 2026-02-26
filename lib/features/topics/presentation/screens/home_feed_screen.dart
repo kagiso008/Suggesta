@@ -35,7 +35,13 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Suggesta'),
+          title: Row(
+            children: [
+              Image.asset('assets/images/app_logo.png', width: 28, height: 28),
+              const SizedBox(width: 8),
+              const Text('Suggesta'),
+            ],
+          ),
           automaticallyImplyLeading: false,
           actions: [
             IconButton(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/topics_provider.dart';
 import '../providers/suggestions_provider.dart';
+import '../../../../shared/widgets/app_toast.dart';
 
 typedef SuggestionAddedCallback = void Function();
 
@@ -70,20 +71,16 @@ class _CreateSuggestionSheetState extends ConsumerState<CreateSuggestionSheet> {
         if (widget.onSuggestionAdded != null) {
           widget.onSuggestionAdded!();
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Suggestion added successfully!'),
-            backgroundColor: Colors.green,
-          ),
+        AppToast.showSuccess(
+          context: context,
+          message: 'Suggestion added successfully!',
         );
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to add suggestion: $error'),
-            backgroundColor: Colors.red,
-          ),
+        AppToast.showError(
+          context: context,
+          message: 'Failed to add suggestion: $error',
         );
       }
     } finally {
@@ -153,7 +150,9 @@ class _CreateSuggestionSheetState extends ConsumerState<CreateSuggestionSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
-                        fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                        fillColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {

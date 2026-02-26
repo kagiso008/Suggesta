@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "864845618308",
+    "project_id": "suggesta-c67a4",
+    "storage_bucket": "suggesta-c67a4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:864845618308:android:efc62b031e9dec9774b6d1",
+        "android_client_info": {
+          "package_name": "com.example.suggesta"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBM3nDkqS0l9hqT65tU0oJ_wUK4OdMpBRg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:864845618308:android:db0dafdb468f9f7474b6d1",
+        "android_client_info": {
+          "package_name": "com.suggesta.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBM3nDkqS0l9hqT65tU0oJ_wUK4OdMpBRg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

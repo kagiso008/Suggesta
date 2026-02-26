@@ -1,9 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../data/topics_repository.dart';
 import '../../../../shared/models/suggestion_model.dart';
 import 'topics_provider.dart';
 

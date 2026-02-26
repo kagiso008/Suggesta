@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
+import '../../../../shared/widgets/app_toast.dart';
 
 class SetupProfileScreen extends ConsumerStatefulWidget {
   const SetupProfileScreen({super.key});
@@ -175,12 +176,9 @@ class _SetupProfileScreenState extends ConsumerState<SetupProfileScreen> {
                         ? null
                         : () {
                             // TODO: Implement profile picture upload
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Profile picture upload coming soon',
-                                ),
-                              ),
+                            AppToast.showInfo(
+                              context: context,
+                              message: 'Profile picture upload coming soon',
                             );
                           },
                     icon: const Icon(Icons.upload_file_outlined),

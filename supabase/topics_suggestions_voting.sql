@@ -142,6 +142,9 @@ CREATE POLICY "Suggestion votes viewable by everyone"
 CREATE POLICY "Authenticated users can vote on suggestions"
   ON suggestion_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Users can update their own suggestion vote"
+  ON suggestion_votes FOR UPDATE USING (auth.uid() = user_id);
+
 CREATE POLICY "Users can remove their own suggestion vote"
   ON suggestion_votes FOR DELETE USING (auth.uid() = user_id);
 
@@ -252,6 +255,8 @@ BEGIN
   UPDATE topics SET view_count = view_count + 1 WHERE id = topic_id;
 END;
 $$;
+
+
 
 
 -- ─── SECTION 5: REALTIME ─────────────────────────────────────

@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../data/topics_repository.dart';
 import 'topics_provider.dart';
 
 class SuggestionVoteNotifier extends AsyncNotifier<Set<String>> {
@@ -15,7 +14,6 @@ class SuggestionVoteNotifier extends AsyncNotifier<Set<String>> {
           .from('suggestion_votes')
           .select('suggestion_id')
           .eq('user_id', user.id)
-          .eq('vote_type', 1) // Only fetch upvotes
           .limit(1000);
 
       final upvotedSuggestionIds = <String>{};
@@ -38,33 +36,55 @@ class SuggestionVoteNotifier extends AsyncNotifier<Set<String>> {
   }
 
   Future<void> toggleVote(String suggestionId, int currentCount) async {
+    print(
+      '[DEBUG] toggleVote called for suggestion: $suggestionId, currentCount: $currentCount',
+    );
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
+      print('[ERROR] toggleVote failed: User not authenticated');
       throw Exception('User must be authenticated to vote');
     }
 
     final state = this.state;
-    if (state is! AsyncData) return;
+    if (state is! AsyncData) {
+      print('[WARN] toggleVote: State is not AsyncData, skipping');
+      return;
+    }
 
     final currentUpvotes = state.value ?? {};
     final hasUpvoted = currentUpvotes.contains(suggestionId);
+    print('[DEBUG] toggleVote: User ${user.id} hasUpvoted: $hasUpvoted');
 
     // Optimistic update
     final newUpvotes = Set<String>.from(currentUpvotes);
     if (hasUpvoted) {
       newUpvotes.remove(suggestionId);
+      print('[DEBUG] toggleVote: Removing vote optimistically');
     } else {
       newUpvotes.add(suggestionId);
+      print('[DEBUG] toggleVote: Adding vote optimistically');
     }
 
     this.state = AsyncValue.data(newUpvotes);
+    print(
+      '[DEBUG] toggleVote: Optimistic update applied, new upvotes count: ${newUpvotes.length}',
+    );
 
     try {
       final repository = ref.read(topicsRepositoryProvider);
-      await repository.toggleSuggestionVote(suggestionId);
-    } catch (e) {
+      print('[DEBUG] toggleVote: Calling repository.toggleSuggestionLike');
+      // Use the new RPC function which returns updated vote count and has_voted status
+      final result = await repository.toggleSuggestionLike(suggestionId);
+      print('[DEBUG] toggleVote: Repository call successful, result: $result');
+      // Note: The RPC function returns the new vote count and has_voted status,
+      // but we don't need to use them here since the optimistic update already
+      // updated the UI and the real-time updates will sync the actual state
+    } catch (e, stackTrace) {
+      print('[ERROR] toggleVote failed for suggestion $suggestionId: $e');
+      print('[ERROR] Stack trace: $stackTrace');
       // Revert on error
       this.state = AsyncValue.data(currentUpvotes);
+      print('[DEBUG] toggleVote: Reverted optimistic update due to error');
       rethrow;
     }
   }
@@ -82,7 +102,6 @@ class SuggestionVoteNotifier extends AsyncNotifier<Set<String>> {
           .from('suggestion_votes')
           .select('suggestion_id')
           .eq('user_id', user.id)
-          .eq('vote_type', 1) // Only fetch upvotes
           .limit(1000);
 
       final upvotedSuggestionIds = <String>{};

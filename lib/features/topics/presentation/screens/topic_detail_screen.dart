@@ -84,11 +84,22 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     final suggestionsAsync = ref.watch(suggestionsProvider(widget.topicId));
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Topic'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Topic',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1F2937), // textPrimary from app_theme
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
+            color: Color(0xFF6366F1), // primaryColor
             onPressed: () {
               // TODO: Implement share functionality
             },
@@ -96,6 +107,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
         ],
       ),
       body: RefreshIndicator(
+        color: Color(0xFF6366F1), // primaryColor
         onRefresh: () async {
           // Invalidate the topic provider to force a fresh fetch
           ref.invalidate(topicProvider(widget.topicId));
@@ -151,28 +163,65 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
 
             // Suggestions header
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
               sliver: SliverToBoxAdapter(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Suggestions',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF6366F1).withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Color(0xFF6366F1).withOpacity(0.1),
+                      width: 1,
                     ),
-                    Text(
-                      suggestionsAsync.maybeWhen(
-                        data: (suggestions) => '${suggestions.length}',
-                        orElse: () => '0',
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.lightbulb_outline,
+                            size: 20,
+                            color: Color(0xFF6366F1),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Suggestions',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                        ],
                       ),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Color(0xFF6366F1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          suggestionsAsync.maybeWhen(
+                            data: (suggestions) => '${suggestions.length}',
+                            orElse: () => '0',
+                          ),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -182,29 +231,69 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
               data: (suggestions) {
                 if (suggestions.isEmpty) {
                   return SliverFillRemaining(
-                    child: Center(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 40,
+                      ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.lightbulb_outline,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.outline,
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Color(0xFF6366F1).withOpacity(0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.lightbulb_outline,
+                              size: 48,
+                              color: Color(0xFF6366F1),
+                            ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           Text(
                             'No suggestions yet',
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1F2937),
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Be the first to suggest an idea!',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            'Be the first to share your idea!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: Color(0xFF6B7280),
+                            ),
                           ),
                           const SizedBox(height: 24),
                           ElevatedButton(
                             onPressed: _showCreateSuggestionSheet,
-                            child: const Text('Add Suggestion'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF6366F1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                            ),
+                            child: const Text(
+                              'Add First Suggestion',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -283,7 +372,11 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateSuggestionSheet,
-        child: const Icon(Icons.add),
+        backgroundColor: Color(0xFF6366F1),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: const Icon(Icons.add, size: 28),
       ),
     );
   }
@@ -291,138 +384,262 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
   Widget _buildTopicHeader(TopicModel topic, int suggestionCount) {
     return Container(
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
+          BoxShadow(
+            color: Color(0xFF6366F1).withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
+        border: Border.all(color: Colors.grey.shade100, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Author and time
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: topic.author?.avatarUrl != null
-                    ? NetworkImage(topic.author!.avatarUrl!)
-                    : null,
-                child: topic.author?.avatarUrl == null
-                    ? Text(topic.author?.username.substring(0, 1) ?? '?')
-                    : null,
+          // Header with subtle gradient
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF6366F1).withOpacity(0.03),
+                  Color(0xFF10B981).withOpacity(0.02),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Author and time
+                Row(
                   children: [
-                    Text(
-                      topic.author?.username ?? 'Anonymous',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Color(0xFF6366F1).withOpacity(0.1),
+                      backgroundImage: topic.author?.avatarUrl != null
+                          ? NetworkImage(topic.author!.avatarUrl!)
+                          : null,
+                      child: topic.author?.avatarUrl == null
+                          ? Text(
+                              topic.author?.username.substring(0, 1) ?? '?',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF6366F1),
+                              ),
+                            )
+                          : null,
                     ),
-                    Text(
-                      _formatTimeAgo(topic.createdAt),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.outline,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            topic.author?.username ?? 'Anonymous',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatTimeAgo(topic.createdAt),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    if (topic.milestoneBadge != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              _getBadgeColor(topic.milestoneBadge!),
+                              _getBadgeColor(
+                                topic.milestoneBadge!,
+                              ).withOpacity(0.8),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _getBadgeColor(
+                                topic.milestoneBadge!,
+                              ).withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _getBadgeText(topic.milestoneBadge!),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-              if (topic.milestoneBadge != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getBadgeColor(topic.milestoneBadge!),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _getBadgeText(topic.milestoneBadge!),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-          // Title
-          Text(
-            topic.title,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-
-          // Description
-          if (topic.description != null && topic.description!.isNotEmpty)
-            Column(
-              children: [
+                // Title
                 Text(
-                  topic.description!,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  topic.title,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2937),
+                    height: 1.3,
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
+                // Description
+                if (topic.description != null && topic.description!.isNotEmpty)
+                  Column(
+                    children: [
+                      Text(
+                        topic.description!,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF4B5563),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
               ],
             ),
+          ),
 
-          // Category and tags
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              if (topic.category != null)
-                Chip(
-                  label: Text(topic.category!),
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withOpacity(0.1),
-                  labelStyle: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600,
+          // Category, tags and stats section
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Category and tags
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (topic.category != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Color(0xFF6366F1).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Color(0xFF6366F1).withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.category,
+                              size: 14,
+                              color: Color(0xFF6366F1),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              topic.category!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF6366F1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ...topic.tags.take(3).map((tag) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.grey.shade200,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          tag,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Stats row with improved design
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade100, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildStatItem(
+                        icon: Icons.lightbulb_outline,
+                        value: suggestionCount.toString(),
+                        label: 'Suggestions',
+                      ),
+                      Container(
+                        height: 40,
+                        width: 1,
+                        color: Colors.grey.shade300,
+                      ),
+                      _buildStatItem(
+                        icon: Icons.remove_red_eye,
+                        value: topic.viewCount.toString(),
+                        label: 'Views',
+                      ),
+                    ],
                   ),
                 ),
-              ...topic.tags.take(3).map((tag) {
-                return Chip(
-                  label: Text(tag),
-                  backgroundColor: Colors.grey[100],
-                  labelStyle: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                );
-              }),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Stats row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildStatItem(
-                icon: Icons.lightbulb_outline,
-                value: suggestionCount.toString(),
-                label: 'Suggestions',
-              ),
-              _buildStatItem(
-                icon: Icons.remove_red_eye,
-                value: topic.viewCount.toString(),
-                label: 'Views',
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -436,19 +653,26 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
   }) {
     return Column(
       children: [
-        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(height: 4),
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Color(0xFF6366F1).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 20, color: Color(0xFF6366F1)),
+        ),
+        const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        Text(
-          label,
           style: TextStyle(
-            fontSize: 12,
-            color: Theme.of(context).colorScheme.outline,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: Color(0xFF1F2937),
           ),
         ),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
       ],
     );
   }

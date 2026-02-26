@@ -30,6 +30,19 @@ class TopicModel {
   });
 
   factory TopicModel.fromJson(Map<String, dynamic> json) {
+    ProfileModel? author;
+    if (json['profiles'] != null && json['profiles'] is Map<String, dynamic>) {
+      author = ProfileModel.fromJson(json['profiles'] as Map<String, dynamic>);
+    } else if (json['username'] != null) {
+      // Handle flat author fields (e.g., from trending RPC function)
+      author = ProfileModel(
+        id: json['user_id'] as String,
+        username: json['username'] as String,
+        avatarUrl: json['avatar_url'] as String?,
+        bio: null, // bio not available in flat format
+      );
+    }
+
     return TopicModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
@@ -42,9 +55,7 @@ class TopicModel {
       suggestionCount: (json['suggestion_count'] as num?)?.toInt() ?? 0,
       milestoneBadge: json['milestone_badge'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
-      author: json['profiles'] != null
-          ? ProfileModel.fromJson(json['profiles'] as Map<String, dynamic>)
-          : null,
+      author: author,
     );
   }
 

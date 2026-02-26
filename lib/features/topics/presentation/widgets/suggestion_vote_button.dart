@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/suggestion_vote_provider.dart';
 import '../providers/suggestions_provider.dart';
 import '../../../../shared/models/suggestion_model.dart';
+import '../../../../shared/widgets/app_toast.dart';
 
 class SuggestionVoteButton extends ConsumerStatefulWidget {
   final SuggestionModel suggestion;
@@ -35,25 +36,30 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
   }
 
   Future<void> _handleVote() async {
-    if (_isVoting) return;
+    print('[DEBUG] _handleVote called for suggestion: ${widget.suggestion.id}');
+    if (_isVoting) {
+      print('[DEBUG] _handleVote: Already voting, skipping');
+      return;
+    }
 
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      // Show auth dialog or snackbar
+      print('[DEBUG] _handleVote: User not authenticated');
+      // Show auth dialog or toast
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please sign in to vote'),
-            duration: Duration(seconds: 2),
-          ),
+        AppToast.showInfo(
+          context: context,
+          message: 'Please sign in to upvote suggestions',
         );
       }
       return;
     }
 
+    print('[DEBUG] _handleVote: User ${user.id} authenticated');
     // Get current vote state from provider
     final voteProvider = ref.read(suggestionVoteProvider.notifier);
     final currentHasVoted = voteProvider.hasVoted(widget.suggestion.id);
+    print('[DEBUG] _handleVote: currentHasVoted: $currentHasVoted');
 
     // Calculate new vote count optimistically
     int newOptimisticCount = _optimisticVoteCount;
@@ -63,13 +69,18 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
       // Removing vote
       newOptimisticCount = _optimisticVoteCount - 1;
       newHasVoted = false;
+      print(
+        '[DEBUG] _handleVote: Removing vote, new count: $newOptimisticCount',
+      );
     } else {
       // Adding vote
       newOptimisticCount = _optimisticVoteCount + 1;
       newHasVoted = true;
+      print('[DEBUG] _handleVote: Adding vote, new count: $newOptimisticCount');
     }
 
     // Optimistic update
+    print('[DEBUG] _handleVote: Applying optimistic update');
     setState(() {
       _isVoting = true;
       _hasError = false;
@@ -80,11 +91,16 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
 
     try {
       // Use the provider's toggleVote method
+      print('[DEBUG] _handleVote: Calling voteProvider.toggleVote');
       await voteProvider.toggleVote(widget.suggestion.id, _optimisticVoteCount);
 
       // Refresh the suggestions provider to get updated vote count
+      print('[DEBUG] _handleVote: Invalidating suggestions provider');
       ref.invalidate(suggestionsProvider(widget.suggestion.topicId));
-    } catch (e) {
+      print('[DEBUG] _handleVote: Vote completed successfully');
+    } catch (e, stackTrace) {
+      print('[ERROR] _handleVote failed: $e');
+      print('[ERROR] Stack trace: $stackTrace');
       setState(() {
         _hasError = true;
         // Revert optimistic update on error
@@ -93,17 +109,15 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
         _hasOptimisticUpdate = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to vote: $e'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppToast.showError(context: context, message: 'Failed to upvote: $e');
       }
     } finally {
       if (mounted) {
         setState(() {
           _isVoting = false;
+          print(
+            '[DEBUG] _handleVote: Voting completed, _isVoting set to false',
+          );
         });
       }
     }
@@ -127,9 +141,9 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
   Widget build(BuildContext context) {
     final voteState = ref.watch(suggestionVoteProvider);
     final serverHasVoted = voteState.maybeWhen(
-      data: (upvotedSuggestionIds) {
-        // Check if user has upvoted this suggestion
-        return upvotedSuggestionIds.contains(widget.suggestion.id);
+      data: (likedSuggestionIds) {
+        // Check if user has liked this suggestion
+        return likedSuggestionIds.contains(widget.suggestion.id);
       },
       orElse: () => false,
     );
@@ -150,42 +164,49 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
   }
 
   Widget _buildCompactVoteButton(int voteCount, bool hasVoted) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Upvote button
-        GestureDetector(
-          onTap: _handleVote,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: hasVoted
-                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.arrow_upward,
+    return GestureDetector(
+      onTap: _handleVote,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: hasVoted
+              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: hasVoted
+                ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Arrow up icon
+            Icon(
+              hasVoted ? Icons.arrow_upward : Icons.arrow_upward_outlined,
               size: 16,
               color: hasVoted
                   ? Theme.of(context).colorScheme.primary
                   : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-          ),
-        ),
 
-        // Vote count
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            _formatCount(voteCount),
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            const SizedBox(width: 6),
+
+            // Vote count
+            Text(
+              _formatCount(voteCount),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: hasVoted
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -193,11 +214,11 @@ class _SuggestionVoteButtonState extends ConsumerState<SuggestionVoteButton> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Upvote button
+        // Upvote button with arrow_up icon
         IconButton(
           onPressed: _handleVote,
           icon: Icon(
-            Icons.arrow_upward,
+            hasVoted ? Icons.arrow_upward : Icons.arrow_upward_outlined,
             color: hasVoted
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/widgets/app_toast.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/bookmarks_provider.dart';
@@ -12,10 +13,56 @@ class BookmarksScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bookmarksAsync = ref.watch(bookmarksProvider);
 
+    Future<void> clearAllBookmarks() async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Clear All Bookmarks'),
+          content: const Text(
+            'Are you sure you want to remove all bookmarks? This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Clear All'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      try {
+        await ref.read(bookmarksProvider.notifier).clearAllBookmarks();
+        if (context.mounted) {
+          AppToast.showSuccess(
+            context: context,
+            message: 'All bookmarks cleared',
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          AppToast.showError(
+            context: context,
+            message: 'Failed to clear bookmarks: $e',
+          );
+        }
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bookmarks'),
         actions: [
+          IconButton(
+            onPressed: clearAllBookmarks,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Clear all bookmarks',
+          ),
           IconButton(
             onPressed: () => ref.read(bookmarksProvider.notifier).refresh(),
             icon: const Icon(Icons.refresh),

@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
+import '../../../../shared/widgets/app_toast.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+  const SignupScreen({super.key});
 
   @override
   ConsumerState<SignupScreen> createState() => _SignupScreenState();
@@ -188,12 +189,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     });
 
     if (emailError != null || passwordError != null || matchError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(emailError ?? passwordError ?? matchError ?? ''),
-          backgroundColor: const Color(0xFFEF4444),
-          duration: const Duration(seconds: 3),
-        ),
+      AppToast.showError(
+        context: context,
+        message: emailError ?? passwordError ?? matchError ?? '',
       );
       return;
     }

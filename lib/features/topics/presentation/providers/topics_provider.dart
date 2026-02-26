@@ -43,7 +43,7 @@ class TopicsNotifier extends AsyncNotifier<List<TopicModel>> {
 
       final updatedTopics = [...currentTopics, ...moreTopics];
       state = AsyncValue.data(updatedTopics);
-    } catch (e, st) {
+    } catch (e) {
       // Don't update state on error for loadMore - keep existing data
       print('Failed to load more topics: $e');
     }

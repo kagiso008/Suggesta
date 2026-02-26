@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/topics_provider.dart';
 import '../providers/user_topics_provider.dart';
+import '../../../../shared/widgets/app_toast.dart';
 
 class CreateTopicScreen extends ConsumerStatefulWidget {
   const CreateTopicScreen({super.key});
@@ -61,9 +62,7 @@ class _CreateTopicScreenState extends ConsumerState<CreateTopicScreen> {
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a category')));
+      AppToast.showInfo(context: context, message: 'Please select a category');
       return;
     }
 
@@ -88,11 +87,9 @@ class _CreateTopicScreenState extends ConsumerState<CreateTopicScreen> {
 
       // Show success message
       if (localContext.mounted) {
-        ScaffoldMessenger.of(localContext).showSnackBar(
-          const SnackBar(
-            content: Text('Topic created successfully!'),
-            backgroundColor: Colors.green,
-          ),
+        AppToast.showSuccess(
+          context: localContext,
+          message: 'Topic created successfully!',
         );
 
         // Invalidate user topics provider to refresh "My Topics" page
@@ -106,11 +103,9 @@ class _CreateTopicScreenState extends ConsumerState<CreateTopicScreen> {
       }
     } catch (e) {
       if (localContext.mounted) {
-        ScaffoldMessenger.of(localContext).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create topic: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+        AppToast.showError(
+          context: localContext,
+          message: 'Failed to create topic: ${e.toString()}',
         );
       }
     } finally {
